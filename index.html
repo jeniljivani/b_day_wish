@@ -6257,58 +6257,83 @@ document.getElementById("startMagic")
 
 
 /* =========================================================
-   MUSIC
+   MUSIC — DEFAULT ON
 ========================================================= */
 
 let musicPlaying = false;
 
-musicToggle.addEventListener(
-  "click",
-  function () {
+birthdayMusic.src = "happy_birthday.mp3";
+birthdayMusic.autoplay = true;
+birthdayMusic.loop = true;
+birthdayMusic.preload = "auto";
+birthdayMusic.volume = 1.0;
+birthdayMusic.muted = false;
 
-    if (!musicPlaying) {
+function updateMusicButton(isPlaying) {
 
-      birthdayMusic
-        .play()
-        .then(() => {
+  musicPlaying = isPlaying;
 
-          musicPlaying = true;
-
-          musicToggle
-            .classList.add("active");
-
-          musicIcon.textContent = "♫";
-
-          musicText.textContent =
-            "MUSIC ON";
-
-        })
-        .catch(() => {
-
-          alert(
-            "Add 'birthday-music.mp3' beside your HTML file to use music."
-          );
-
-        });
-
-    } else {
-
-      birthdayMusic.pause();
-
-      musicPlaying = false;
-
-      musicToggle
-        .classList.remove("active");
-
-      musicIcon.textContent = "♪";
-
-      musicText.textContent =
-        "MUSIC OFF";
-
-    }
-
+  if (isPlaying) {
+    musicToggle.classList.add("active");
+    musicIcon.textContent = "♫";
+    musicText.textContent = "MUSIC ON";
+  } else {
+    musicToggle.classList.remove("active");
+    musicIcon.textContent = "♪";
+    musicText.textContent = "MUSIC OFF";
   }
-);
+}
+
+birthdayMusic.addEventListener("play", () => updateMusicButton(true));
+birthdayMusic.addEventListener("pause", () => updateMusicButton(false));
+
+function startBirthdayMusic() {
+
+  birthdayMusic.muted = false;
+  birthdayMusic.volume = 1.0;
+
+  const promise = birthdayMusic.play();
+
+  if (promise && typeof promise.catch === "function") {
+    promise
+      .then(() => updateMusicButton(true))
+      .catch(() => {
+        // Browser autoplay policy may require one user interaction.
+      });
+  }
+}
+
+// Default ON: try as soon as the page is ready.
+window.addEventListener("load", startBirthdayMusic);
+
+// If Chrome/Edge blocks autoplay, the first tap/click/keypress starts it.
+function unlockBirthdayMusic() {
+
+  if (birthdayMusic.paused) {
+    startBirthdayMusic();
+  }
+
+  document.removeEventListener("click", unlockBirthdayMusic);
+  document.removeEventListener("touchstart", unlockBirthdayMusic);
+  document.removeEventListener("keydown", unlockBirthdayMusic);
+}
+
+document.addEventListener("click", unlockBirthdayMusic);
+document.addEventListener("touchstart", unlockBirthdayMusic);
+document.addEventListener("keydown", unlockBirthdayMusic);
+
+// Manual ON/OFF button.
+musicToggle.addEventListener("click", function (event) {
+
+  event.stopPropagation();
+
+  if (birthdayMusic.paused) {
+    startBirthdayMusic();
+  } else {
+    birthdayMusic.pause();
+  }
+
+});
 
 
 /* =========================================================
@@ -6924,82 +6949,6 @@ document.addEventListener(
 
 </script>
 
-
-/* =========================================================
-   HAPPY BIRTHDAY MP3 — DEFAULT ON
-========================================================= */
-(function setupHappyBirthdayMusic() {
-  const music = document.querySelector("audio");
-  if (!music) return;
-
-  music.src = "happy_birthday.mp3";
-  music.preload = "auto";
-  music.loop = true;
-  music.volume = 1.0;
-  music.muted = false;
-  music.autoplay = true;
-
-  const toggle = document.getElementById("musicToggle");
-  const icon = document.getElementById("musicIcon");
-  const text = document.getElementById("musicText");
-
-  function updateMusicUI(isPlaying) {
-    if (!toggle) return;
-    toggle.classList.toggle("active", isPlaying);
-    toggle.setAttribute("aria-pressed", String(isPlaying));
-    if (icon) icon.textContent = isPlaying ? "♫" : "♪";
-    if (text) text.textContent = isPlaying ? "MUSIC ON" : "MUSIC OFF";
-  }
-
-  music.addEventListener("play", () => updateMusicUI(true));
-  music.addEventListener("pause", () => updateMusicUI(false));
-
-  // Try immediately when the page loads.
-  const tryPlay = () => {
-    music.muted = false;
-    music.volume = 1.0;
-    const promise = music.play();
-
-    if (promise && typeof promise.catch === "function") {
-      promise.catch(() => {
-        // Chrome/Edge may block autoplay. Retry after the first interaction.
-      });
-    }
-  };
-
-  window.addEventListener("load", tryPlay);
-
-  // If autoplay is blocked, the first interaction starts it automatically.
-  const unlockMusic = () => {
-    if (music.paused) tryPlay();
-    document.removeEventListener("click", unlockMusic);
-    document.removeEventListener("touchstart", unlockMusic);
-    document.removeEventListener("keydown", unlockMusic);
-  };
-
-  document.addEventListener("click", unlockMusic);
-  document.addEventListener("touchstart", unlockMusic);
-  document.addEventListener("keydown", unlockMusic);
-
-  // Existing MUSIC button remains available.
-  if (toggle) {
-    toggle.addEventListener("click", async (event) => {
-      event.stopPropagation();
-
-      try {
-        if (music.paused) {
-          music.muted = false;
-          music.volume = 1.0;
-          await music.play();
-        } else {
-          music.pause();
-        }
-      } catch (error) {
-        console.warn("Music could not start:", error);
-      }
-    });
-  }
-})();
 
 </body>
 </html>
