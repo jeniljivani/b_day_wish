@@ -5444,7 +5444,9 @@ body::before {
 
   <audio
     id="birthdayMusic"
-   autoplay loop preload="auto">
+    loop
+    preload="none"
+  >
     <source src="happy_birthday.mp3" type="audio/mpeg">
   </audio>
 
@@ -6257,83 +6259,58 @@ document.getElementById("startMagic")
 
 
 /* =========================================================
-   MUSIC — DEFAULT ON
+   MUSIC
 ========================================================= */
 
 let musicPlaying = false;
 
-birthdayMusic.src = "happy_birthday.mp3";
-birthdayMusic.autoplay = true;
-birthdayMusic.loop = true;
-birthdayMusic.preload = "auto";
-birthdayMusic.volume = 1.0;
-birthdayMusic.muted = false;
+musicToggle.addEventListener(
+  "click",
+  function () {
 
-function updateMusicButton(isPlaying) {
+    if (!musicPlaying) {
 
-  musicPlaying = isPlaying;
+      birthdayMusic
+        .play()
+        .then(() => {
 
-  if (isPlaying) {
-    musicToggle.classList.add("active");
-    musicIcon.textContent = "♫";
-    musicText.textContent = "MUSIC ON";
-  } else {
-    musicToggle.classList.remove("active");
-    musicIcon.textContent = "♪";
-    musicText.textContent = "MUSIC OFF";
+          musicPlaying = true;
+
+          musicToggle
+            .classList.add("active");
+
+          musicIcon.textContent = "♫";
+
+          musicText.textContent =
+            "MUSIC ON";
+
+        })
+        .catch(() => {
+
+          alert(
+            "Add 'birthday-music.mp3' beside your HTML file to use music."
+          );
+
+        });
+
+    } else {
+
+      birthdayMusic.pause();
+
+      musicPlaying = false;
+
+      musicToggle
+        .classList.remove("active");
+
+      musicIcon.textContent = "♪";
+
+      musicText.textContent =
+        "MUSIC OFF";
+
+    }
+
   }
-}
-
-birthdayMusic.addEventListener("play", () => updateMusicButton(true));
-birthdayMusic.addEventListener("pause", () => updateMusicButton(false));
-
-function startBirthdayMusic() {
-
-  birthdayMusic.muted = false;
-  birthdayMusic.volume = 1.0;
-
-  const promise = birthdayMusic.play();
-
-  if (promise && typeof promise.catch === "function") {
-    promise
-      .then(() => updateMusicButton(true))
-      .catch(() => {
-        // Browser autoplay policy may require one user interaction.
-      });
-  }
-}
-
-// Default ON: try as soon as the page is ready.
-window.addEventListener("load", startBirthdayMusic);
-
-// If Chrome/Edge blocks autoplay, the first tap/click/keypress starts it.
-function unlockBirthdayMusic() {
-
-  if (birthdayMusic.paused) {
-    startBirthdayMusic();
-  }
-
-  document.removeEventListener("click", unlockBirthdayMusic);
-  document.removeEventListener("touchstart", unlockBirthdayMusic);
-  document.removeEventListener("keydown", unlockBirthdayMusic);
-}
-
-document.addEventListener("click", unlockBirthdayMusic);
-document.addEventListener("touchstart", unlockBirthdayMusic);
-document.addEventListener("keydown", unlockBirthdayMusic);
-
-// Manual ON/OFF button.
-musicToggle.addEventListener("click", function (event) {
-
-  event.stopPropagation();
-
-  if (birthdayMusic.paused) {
-    startBirthdayMusic();
-  } else {
-    birthdayMusic.pause();
-  }
-
-});
+);
 
 
 /* =========================================================
@@ -6949,6 +6926,75 @@ document.addEventListener(
 
 </script>
 
+
+/* =========================================================
+   HAPPY BIRTHDAY MP3
+   Put "happy_birthday.mp3" in the same folder as this HTML.
+========================================================= */
+(function setupHappyBirthdayMusic() {
+  const music = document.querySelector("audio");
+
+  if (!music) return;
+
+  music.src = "happy_birthday.mp3";
+  music.preload = "auto";
+  music.loop = true;
+
+  // Browser volume range is 0–1. 1.0 = maximum browser volume.
+  music.volume = 1.0;
+
+  // Keep the existing music button working.
+  const toggle = document.getElementById("musicToggle");
+  const icon = document.getElementById("musicIcon");
+  const text = document.getElementById("musicText");
+
+  function updateMusicUI(isPlaying) {
+    if (!toggle) return;
+
+    toggle.classList.toggle("active", isPlaying);
+    toggle.setAttribute("aria-pressed", String(isPlaying));
+
+    if (icon) icon.textContent = isPlaying ? "♫" : "♪";
+    if (text) text.textContent = isPlaying ? "MUSIC ON" : "MUSIC OFF";
+  }
+
+  music.addEventListener("play", () => updateMusicUI(true));
+  music.addEventListener("pause", () => updateMusicUI(false));
+
+  if (toggle) {
+    toggle.addEventListener("click", async () => {
+      try {
+        if (music.paused) {
+          await music.play();
+        } else {
+          music.pause();
+        }
+      } catch (error) {
+        console.warn("Music could not start automatically:", error);
+      }
+    });
+  }
+
+  // Start only after the visitor interacts with the page,
+  // which avoids browser autoplay restrictions.
+  const startMusic = async () => {
+    try {
+      if (music.paused) {
+        await music.play();
+      }
+    } catch (error) {
+      // Autoplay may still be blocked; the music button remains available.
+    }
+
+    document.removeEventListener("click", startMusic);
+    document.removeEventListener("touchstart", startMusic);
+    document.removeEventListener("keydown", startMusic);
+  };
+
+  document.addEventListener("click", startMusic, { once: true });
+  document.addEventListener("touchstart", startMusic, { once: true });
+  document.addEventListener("keydown", startMusic, { once: true });
+})();
 
 </body>
 </html>
