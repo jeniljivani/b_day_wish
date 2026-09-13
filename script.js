@@ -158,50 +158,89 @@ $(function () {
     }, 2850);
   });
 
-  /* ---------- Live age: years / months / days + hover hours/minutes/seconds ---------- */
+  /* ---------- Live age: calendar-accurate years / months / days ---------- */
+  function daysInMonth(year, monthIndex){
+    return new Date(year, monthIndex + 1, 0).getDate();
+  }
+
+  function normalizeDateOnly(date){
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+  }
+
+  function addYearsClamped(date, years){
+    const year = date.getFullYear() + years;
+    const month = date.getMonth();
+    const day = Math.min(date.getDate(), daysInMonth(year, month));
+    return new Date(year, month, day, 0, 0, 0, 0);
+  }
+
+  function addMonthsClamped(date, months){
+    const total = date.getFullYear() * 12 + date.getMonth() + months;
+    const year = Math.floor(total / 12);
+    const month = ((total % 12) + 12) % 12;
+    const day = Math.min(date.getDate(), daysInMonth(year, month));
+    return new Date(year, month, day, 0, 0, 0, 0);
+  }
+
   function calendarAge(birthDate, now){
-    let years = now.getFullYear() - birthDate.getFullYear();
-    let anchor = new Date(birthDate);
-    anchor.setFullYear(birthDate.getFullYear() + years);
-    if(anchor > now){
-      years--;
-      anchor = new Date(birthDate);
-      anchor.setFullYear(birthDate.getFullYear() + years);
+    const birth = normalizeDateOnly(birthDate);
+    const today = normalizeDateOnly(now);
+
+    if(birth > today){
+      return {years:0, months:0, days:0, hours:0, minutes:0, seconds:0};
     }
 
-    let months = (now.getMonth() - anchor.getMonth());
-    if(months < 0) months += 12;
-    let monthAnchor = new Date(anchor);
-    monthAnchor.setMonth(anchor.getMonth() + months);
-    if(monthAnchor > now){
-      months--;
-      monthAnchor = new Date(anchor);
-      monthAnchor.setMonth(anchor.getMonth() + Math.max(0, months));
+    // First resolve complete calendar years.
+    let years = today.getFullYear() - birth.getFullYear();
+    let yearAnchor = addYearsClamped(birth, years);
+    if(yearAnchor > today){
+      years -= 1;
+      yearAnchor = addYearsClamped(birth, years);
     }
 
-    const remainingMs = Math.max(0, now - monthAnchor);
-    const days = Math.floor(remainingMs / 86400000);
-    const afterDays = remainingMs - days * 86400000;
-    const hours = Math.floor(afterDays / 3600000);
-    const afterHours = afterDays - hours * 3600000;
-    const minutes = Math.floor(afterHours / 60000);
-    const seconds = Math.floor((afterHours - minutes * 60000) / 1000);
+    // Then resolve complete calendar months inside the remaining year.
+    let months = (today.getFullYear() - yearAnchor.getFullYear()) * 12 +
+                 (today.getMonth() - yearAnchor.getMonth());
+    if(months < 0) months = 0;
 
-    return {years,months,days,hours,minutes,seconds};
+    let monthAnchor = addMonthsClamped(yearAnchor, months);
+    if(monthAnchor > today){
+      months -= 1;
+      monthAnchor = addMonthsClamped(yearAnchor, months);
+    }
+
+    // Remaining whole calendar days can never exceed the current month's length.
+    const days = Math.floor((today.getTime() - monthAnchor.getTime()) / 86400000);
+
+    // Time is deliberately separate from Y/M/D. Birthday input has no time, so midnight is used.
+    const elapsedToday = Math.max(0, now.getTime() - today.getTime());
+    const hours = Math.floor(elapsedToday / 3600000);
+    const minutes = Math.floor((elapsedToday % 3600000) / 60000);
+    const seconds = Math.floor((elapsedToday % 60000) / 1000);
+
+    return {years, months, days, hours, minutes, seconds};
   }
 
   function updateLiveAge(){
     const value = personalData.birthday || CONFIG.birthday;
     if(!value){
-      $("#liveAgeYears,#liveAgeMonths,#liveAgeDays,#liveAgeHours,#liveAgeMinutes,#liveAgeSeconds").text("0");
+      $("#liveAgeYears,#liveAgeMonths,#liveAgeDays").text("0");
+      $("#liveAgeHours,#liveAgeMinutes,#liveAgeSeconds").text("00");
       return;
     }
-    const birth = new Date(`${value}T00:00:00`);
+
+    const parts = String(value).split("-").map(Number);
+    if(parts.length !== 3 || parts.some(Number.isNaN)) return;
+
+    const birth = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
     const now = new Date();
-    if(Number.isNaN(birth.getTime()) || birth > now){
+
+    // Reject invalid dates (e.g. 2025-02-31) instead of allowing JS to roll them into another month.
+    if(birth.getFullYear() !== parts[0] || birth.getMonth() !== parts[1] - 1 || birth.getDate() !== parts[2] || birth > now){
       return;
     }
-    const age = calendarAge(birth,now);
+
+    const age = calendarAge(birth, now);
     $("#liveAgeYears").text(age.years);
     $("#liveAgeMonths").text(age.months);
     $("#liveAgeDays").text(age.days);
